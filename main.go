@@ -3,7 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
-	"strconv"
+	"p2p-file-sharing/internal/receiver"
+	"p2p-file-sharing/internal/sender"
 )
 
 func main() {
@@ -12,19 +13,16 @@ func main() {
 		os.Exit(1)
 	}
 
-	port, err := strconv.Atoi(os.Args[3])
-	if err != nil {
-		fmt.Printf("Invalid port %s", os.Args[3])
-		os.Exit(1)
-	}
-
+	port := os.Args[3]
 	file := os.Args[2]
 
 	switch os.Args[1] {
 	case "send":
-		fmt.Printf("Sending file %s to port %d\n", file, port)
+		s := sender.NewSender(port, file)
+		s.Send()
 	case "receive":
-		fmt.Printf("Receiving file %s from port %d\n", file, port)
+		r := receiver.NewReceiver(port, file)
+		r.Receive()
 	default:
 		fmt.Printf("Invalid command %s\n", os.Args[1])
 		os.Exit(1)

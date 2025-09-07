@@ -24,7 +24,7 @@ func NewReceiver(port string, FileName string) *Receiver {
 const BUFFER_SIZE = 2048
 
 func (r *Receiver) Receive() {
-	conn, err := net.Dial("tcp", r.Port)
+	conn, err := net.Dial("tcp", "localhost:"+r.Port)
 	if err != nil {
 		log.Fatalf("Error connecting to the sender %v\n", err)
 	}
@@ -46,6 +46,11 @@ func (r *Receiver) Receive() {
 	r.receiveFileData(conn, file, int64(header.Size))
 
 	fmt.Println("Checking CRC checksum")
+
+	// Reset file pointer to beginning before CRC calculation
+	if _, err := file.Seek(0, 0); err != nil {
+		log.Fatalf("Error seeking to beginning of file: %v", err)
+	}
 	receivedFileCRC, err := utils.CalculateCRC(file)
 	if err != nil {
 		log.Fatalf("Error calculating file for received File %v\n", err)

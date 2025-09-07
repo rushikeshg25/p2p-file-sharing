@@ -40,6 +40,11 @@ func (s *Sender) Send() {
 		log.Fatalf("Error calculating CRC: %v", err)
 	}
 
+	// Reset file pointer to beginning after CRC calculation
+	if _, err := file.Seek(0, 0); err != nil {
+		log.Fatalf("Error seeking to beginning of file: %v", err)
+	}
+
 	listener, err := net.Listen("tcp", ":"+s.Port)
 	if err != nil {
 		log.Fatalf("Couldnt start tcp sender")
