@@ -12,7 +12,7 @@ const (
 	HEADER_SIZE   = 4 + 4 + 8 + 4 + 1 // Protocol + version + size + crc + name_len
 )
 
-type Header struct {
+type FileHeader struct {
 	Protocol uint32
 	Version  uint32
 	Size     uint64
@@ -21,7 +21,7 @@ type Header struct {
 	Name     string
 }
 
-func (h *Header) Encode() ([]byte, error) {
+func (h *FileHeader) Encode() ([]byte, error) {
 	if len(h.Name) > 255 {
 		return nil, errors.New("name too long")
 	}
@@ -39,13 +39,13 @@ func (h *Header) Encode() ([]byte, error) {
 	return headerBuf, nil
 }
 
-func Decodeheader(r io.Reader) (*Header, error) {
+func Decode(r io.Reader) (*FileHeader, error) {
 	header := make([]byte, HEADER_SIZE)
 	if _, err := io.ReadFull(r, header); err != nil {
 		return nil, err
 	}
 
-	h := &Header{
+	h := &FileHeader{
 		Protocol: binary.BigEndian.Uint32(header[0:4]),
 		Version:  binary.BigEndian.Uint32(header[4:8]),
 		Size:     binary.BigEndian.Uint64(header[8:16]),
