@@ -69,6 +69,8 @@ func (r *Receiver) receiveFileData(conn net.Conn, file *os.File, fileSize int64)
 	buffer := make([]byte, BUFFER_SIZE)
 	var totalReceived int64
 
+	progress := utils.NewProgressBar(fileSize, "Receiving")
+
 	for totalReceived < fileSize {
 		remainingBytesSize := fileSize - totalReceived
 		bufSize := BUFFER_SIZE
@@ -86,5 +88,8 @@ func (r *Receiver) receiveFileData(conn net.Conn, file *os.File, fileSize int64)
 		}
 
 		totalReceived += int64(n)
+		progress.Add(int64(n))
 	}
+
+	progress.Finish()
 }

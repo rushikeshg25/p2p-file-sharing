@@ -90,6 +90,8 @@ func (s *Sender) SendFile(conn net.Conn, file *os.File, size int64) {
 	buffer := make([]byte, BUFFER_SIZE)
 	var totalSent int64
 
+	progress := utils.NewProgressBar(size, "Sending")
+
 	for {
 		n, err := file.Read(buffer)
 		if err == io.EOF {
@@ -102,6 +104,8 @@ func (s *Sender) SendFile(conn net.Conn, file *os.File, size int64) {
 			log.Fatalf("Error seding file bytes to the sender %v\n", err)
 		}
 		totalSent += int64(n)
+		progress.Add(int64(n))
 	}
+	progress.Finish()
 	fmt.Println("file sent")
 }
