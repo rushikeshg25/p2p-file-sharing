@@ -1,6 +1,10 @@
 # P2P File Sharing
 
-A peer-to-peer file sharing application that enables direct file transfer between devices over TCP connections with robust error checking and streaming capabilities.
+A peer-to-peer file sharing application that enables direct file transfer between devices over TCP connections with streaming.
+
+
+https://github.com/user-attachments/assets/faa4a279-79c2-4e1a-aa0e-f1e8f3445893
+
 
 ## Features
 
