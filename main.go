@@ -2,43 +2,50 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"p2p-file-sharing/internal/receiver"
 	"p2p-file-sharing/internal/sender"
 )
 
 func main() {
-	if len(os.Args) < 2 {
-		printUsage()
+	if err := run(os.Args[1:]); err != nil {
+		log.Printf("Error: %v", err)
 		os.Exit(1)
 	}
+}
 
-	switch os.Args[1] {
+func run(args []string) error {
+	if len(args) < 1 {
+		printUsage()
+		return fmt.Errorf("missing command")
+	}
+
+	switch args[0] {
 	case "send":
-		if len(os.Args) != 4 {
+		if len(args) != 3 {
 			printUsage()
-			os.Exit(1)
+			return fmt.Errorf("send requires a file and port")
 		}
-		s := sender.NewSender(os.Args[3], os.Args[2])
-		s.Send()
+		s := sender.NewSender(args[2], args[1])
+		return s.Send()
 	case "receive":
 		address := "localhost"
-		fileArg := 2
-		portArg := 3
-		if len(os.Args) == 5 {
-			address = os.Args[2]
-			fileArg = 3
-			portArg = 4
-		} else if len(os.Args) != 4 {
+		fileArg := 1
+		portArg := 2
+		if len(args) == 4 {
+			address = args[1]
+			fileArg = 2
+			portArg = 3
+		} else if len(args) != 3 {
 			printUsage()
-			os.Exit(1)
+			return fmt.Errorf("receive requires an output file and port, with an optional sender IP")
 		}
-		r := receiver.NewReceiver(address, os.Args[portArg], os.Args[fileArg])
-		r.Receive()
+		r := receiver.NewReceiver(address, args[portArg], args[fileArg])
+		return r.Receive()
 	default:
-		fmt.Printf("Invalid command %s\n", os.Args[1])
 		printUsage()
-		os.Exit(1)
+		return fmt.Errorf("invalid command %q", args[0])
 	}
 }
 

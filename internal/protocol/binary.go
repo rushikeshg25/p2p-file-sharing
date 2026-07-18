@@ -22,6 +22,9 @@ type FileHeader struct {
 }
 
 func (h *FileHeader) Encode() ([]byte, error) {
+	if len(h.Name) == 0 {
+		return nil, errors.New("filename is empty")
+	}
 	if len(h.Name) > 255 {
 		return nil, errors.New("name too long")
 	}
@@ -33,7 +36,7 @@ func (h *FileHeader) Encode() ([]byte, error) {
 	binary.BigEndian.PutUint32(headerBuf[4:8], VERSION)
 	binary.BigEndian.PutUint64(headerBuf[8:16], h.Size)
 	binary.BigEndian.PutUint32(headerBuf[16:20], h.CRC)
-	headerBuf[20] = h.NameLen
+	headerBuf[20] = uint8(len(h.Name))
 	copy(headerBuf[21:], h.Name)
 
 	return headerBuf, nil

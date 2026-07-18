@@ -3,11 +3,12 @@ package sender
 import (
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"os"
 	"p2p-file-sharing/internal/protocol"
 	"p2p-file-sharing/internal/utils"
+	"path/filepath"
+	"time"
 )
 
 type Sender struct {
@@ -16,6 +17,7 @@ type Sender struct {
 }
 
 const BUFFER_SIZE = 2048 //File chunk size 2KB
+const transferIdleTimeout = 30 * time.Second
 
 func NewSender(port string, FileName string) *Sender {
 	return &Sender{
@@ -24,32 +26,50 @@ func NewSender(port string, FileName string) *Sender {
 	}
 }
 
-func (s *Sender) Send() {
+func (s *Sender) Send() error {
+	if err := utils.ValidatePort(s.Port); err != nil {
+		return err
+	}
+
 	file, err := os.Open(s.FileName)
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("open source file: %w", err)
 	}
 	defer file.Close()
 
 	fileInfo, err := file.Stat()
 	if err != nil {
-		log.Fatalf("Error getting file info: %v", err)
+		return fmt.Errorf("get source file info: %w", err)
 	}
+	if !fileInfo.Mode().IsRegular() {
+		return fmt.Errorf("source %q is not a regular file", s.FileName)
+	}
+
+	fileName := filepath.Base(s.FileName)
+	if len(fileName) == 0 || len(fileName) > 255 {
+		return fmt.Errorf("source filename must contain 1 to 255 bytes")
+	}
+
+	fmt.Printf("Calculating checksum for %s...\n", s.FileName)
 	crcVal, err := utils.CalculateCRC(file)
 	if err != nil {
-		log.Fatalf("Error calculating CRC: %v", err)
+		return fmt.Errorf("calculate source checksum: %w", err)
 	}
 
-	// Reset file pointer to beginning after CRC calculation
 	if _, err := file.Seek(0, 0); err != nil {
-		log.Fatalf("Error seeking to beginning of file: %v", err)
+		return fmt.Errorf("rewind source file: %w", err)
 	}
 
-	listener, err := net.Listen("tcp", ":"+s.Port)
+	listener, err := net.Listen("tcp", net.JoinHostPort("", s.Port))
 	if err != nil {
-		log.Fatalf("Couldnt start tcp sender")
+		return fmt.Errorf("listen on port %s: %w", s.Port, err)
 	}
+	defer listener.Close()
 
+	return s.send(listener, file, fileInfo, fileName, crcVal)
+}
+
+func (s *Sender) send(listener net.Listener, file *os.File, fileInfo os.FileInfo, fileName string, crcVal uint32) error {
 	fmt.Printf("Server listening on port %s\n", s.Port)
 	fmt.Printf("File: %s\n", s.FileName)
 	fmt.Printf("CRC32: %08x\n", crcVal)
@@ -57,7 +77,7 @@ func (s *Sender) Send() {
 
 	conn, err := listener.Accept()
 	if err != nil {
-		log.Fatalf("connection failed: %v", err)
+		return fmt.Errorf("accept receiver connection: %w", err)
 	}
 	defer conn.Close()
 
@@ -68,27 +88,28 @@ func (s *Sender) Send() {
 		Version:  protocol.VERSION,
 		Size:     uint64(fileInfo.Size()),
 		CRC:      crcVal,
-		NameLen:  uint8(len(s.FileName)),
-		Name:     s.FileName,
+		NameLen:  uint8(len(fileName)),
+		Name:     fileName,
 	}
 
 	headerBytes, err := header.Encode()
 	if err != nil {
-		log.Fatalf("Error encoding header: %v", err)
+		return fmt.Errorf("encode file header: %w", err)
 	}
 
-	if _, err := conn.Write(headerBytes); err != nil {
-		log.Fatalf("Couldn't send header Bytes")
+	if err := writeAll(conn, headerBytes); err != nil {
+		return fmt.Errorf("send file header: %w", err)
 	}
 
 	fmt.Println("Starting to Send file Chunks")
-	s.SendFile(conn, file, fileInfo.Size())
-
+	if err := s.SendFile(conn, file, fileInfo.Size()); err != nil {
+		return err
+	}
+	return nil
 }
 
-func (s *Sender) SendFile(conn net.Conn, file *os.File, size int64) {
+func (s *Sender) SendFile(conn net.Conn, file *os.File, size int64) error {
 	buffer := make([]byte, BUFFER_SIZE)
-	var totalSent int64
 
 	progress := utils.NewProgressBar(size, "Sending")
 
@@ -98,14 +119,31 @@ func (s *Sender) SendFile(conn net.Conn, file *os.File, size int64) {
 			break
 		}
 		if err != nil {
-			log.Fatalf("Error reading file in bytes %v\n", err)
+			return fmt.Errorf("read source file: %w", err)
 		}
-		if _, err := conn.Write(buffer[:n]); err != nil {
-			log.Fatalf("Error seding file bytes to the sender %v\n", err)
+		if err := writeAll(conn, buffer[:n]); err != nil {
+			return fmt.Errorf("send file data: %w", err)
 		}
-		totalSent += int64(n)
 		progress.Add(int64(n))
 	}
 	progress.Finish()
 	fmt.Println("file sent")
+	return nil
+}
+
+func writeAll(conn net.Conn, data []byte) error {
+	for len(data) > 0 {
+		if err := conn.SetWriteDeadline(time.Now().Add(transferIdleTimeout)); err != nil {
+			return err
+		}
+		n, err := conn.Write(data)
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return io.ErrShortWrite
+		}
+		data = data[n:]
+	}
+	return nil
 }
