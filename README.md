@@ -20,7 +20,7 @@ The application operates on a simple client-server model where:
 
 - One peer acts as the **sender** (server) and shares a file on a specified port
 - Another peer acts as the **receiver** (client) and connects to download the file
-- Files are transmitted in chunks over TCP with CRC validation for each chunk
+- Files are transmitted in chunks over TCP and validated with a whole-file CRC after transfer
 - Both peers must be on the same network or have network connectivity
 
 ## Installation
@@ -30,8 +30,7 @@ The application operates on a simple client-server model where:
 git clone https://github.com/rushikeshg25/p2p-file-sharing.git
 cd p2p-file-sharing
 
-# Install dependencies (if any)
-# Add installation instructions based on your project setup
+make build
 ```
 
 ## Usage
@@ -41,13 +40,13 @@ cd p2p-file-sharing
 To share a file, use the `send` command:
 
 ```bash
-p2p-share send <filename> <port>
+./bin/p2p-share send <filename> <port>
 ```
 
 **Example:**
 
 ```bash
-p2p-share send 50mb.mov 3001
+./bin/p2p-share send 50mb.mov 3001
 ```
 
 This command:
@@ -61,13 +60,13 @@ This command:
 To download a file from another device on the local network, use the sender's local IP address:
 
 ```bash
-p2p-share receive <sender-ip> <filename> <port>
+./bin/p2p-share receive <sender-ip> <output-filename> <port>
 ```
 
 **Example:**
 
 ```bash
-p2p-share receive 192.168.1.42 filename 3001
+./bin/p2p-share receive 192.168.1.42 received.mov 3001
 ```
 
 This command:
@@ -79,7 +78,7 @@ This command:
 When both commands run on the same device, the sender IP can be omitted and the receiver defaults to `localhost`:
 
 ```bash
-p2p-share receive filename 3001
+./bin/p2p-share receive received.mov 3001
 ```
 
 ## Technical Details
@@ -87,8 +86,9 @@ p2p-share receive filename 3001
 ### Protocol
 
 - **Transport Layer**: TCP for reliable data transmission
-- **Data Integrity**: CRC (Cyclic Redundancy Check) validation for each file chunk
+- **Data Integrity**: Whole-file CRC32 validation after the transfer completes
 - **Streaming**: Files are transmitted in chunks to handle large files efficiently
+- **Output Safety**: Received data is written to a temporary file and published only after CRC verification; existing destination files are never overwritten
 
 ### Network Requirements
 
@@ -101,21 +101,22 @@ p2p-share receive filename 3001
 1. **Sender Side**:
 
    ```bash
-   p2p-share send document.pdf 3001
+   ./bin/p2p-share send document.pdf 3001
    # Server starts and waits for connections on port 3001
    ```
 
 2. **Receiver Side**:
    ```bash
-   p2p-share receive 192.168.1.42 document.pdf 3001
+   ./bin/p2p-share receive 192.168.1.42 document.pdf 3001
    # Connects to sender and downloads document.pdf
    ```
 
 ## Error Handling
 
-- **CRC Validation**: Each chunk is validated using CRC checksums
-- **Connection Errors**: Automatic retry mechanisms for network interruptions
-- **File Integrity**: Complete file validation after transfer completion
+- **CRC Validation**: The complete received file is checked before it is published
+- **Connection Errors**: Connection and stalled-transfer errors are reported with context; rerun the command to retry
+- **Interrupted Transfers**: Partial temporary files are removed automatically
+- **Existing Files**: The receiver refuses to overwrite an existing output path
 
 ## Port Configuration
 

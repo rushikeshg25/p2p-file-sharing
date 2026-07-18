@@ -1,10 +1,11 @@
-PHONY: build clean executable
+.PHONY: build clean executable
 
 build:
+	mkdir -p ./bin
 	go build -o ./bin/p2p-share
 
 clean:
-	rm ./bin/p2p-share
+	rm -f ./bin/p2p-share
 
 executable:
 	chmod +x ./bin/p2p-share
