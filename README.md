@@ -58,23 +58,29 @@ This command:
 
 ### Receiving a File
 
-To download a file, use the `receive` command:
+To download a file from another device on the local network, use the sender's local IP address:
 
 ```bash
-p2p-share receive <filename> <port>
+p2p-share receive <sender-ip> <filename> <port>
 ```
 
 **Example:**
 
 ```bash
-p2p-share receive filename 3001
+p2p-share receive 192.168.1.42 filename 3001
 ```
 
 This command:
 
-- Connects to a sender on port 3001
+- Connects to the sender at `192.168.1.42` on port 3001
 - Downloads the file
 - Saves the file to the current directory
+
+When both commands run on the same device, the sender IP can be omitted and the receiver defaults to `localhost`:
+
+```bash
+p2p-share receive filename 3001
+```
 
 ## Technical Details
 
@@ -101,7 +107,7 @@ This command:
 
 2. **Receiver Side**:
    ```bash
-   p2p-share receive document.pdf 3001
+   p2p-share receive 192.168.1.42 document.pdf 3001
    # Connects to sender and downloads document.pdf
    ```
 

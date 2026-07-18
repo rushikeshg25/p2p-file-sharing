@@ -10,12 +10,14 @@ import (
 )
 
 type Receiver struct {
+	Address  string
 	Port     string
 	FileName string
 }
 
-func NewReceiver(port string, FileName string) *Receiver {
+func NewReceiver(address string, port string, FileName string) *Receiver {
 	return &Receiver{
+		Address:  address,
 		Port:     port,
 		FileName: FileName,
 	}
@@ -24,7 +26,7 @@ func NewReceiver(port string, FileName string) *Receiver {
 const BUFFER_SIZE = 2048
 
 func (r *Receiver) Receive() {
-	conn, err := net.Dial("tcp", "localhost:"+r.Port)
+	conn, err := net.Dial("tcp", net.JoinHostPort(r.Address, r.Port))
 	if err != nil {
 		log.Fatalf("Error connecting to the sender %v\n", err)
 	}
