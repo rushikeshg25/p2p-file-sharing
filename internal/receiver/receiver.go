@@ -7,6 +7,7 @@ import (
 	"os"
 	"p2p-file-sharing/internal/protocol"
 	"p2p-file-sharing/internal/utils"
+	"time"
 )
 
 type Receiver struct {
@@ -26,15 +27,24 @@ func NewReceiver(address string, port string, FileName string) *Receiver {
 const BUFFER_SIZE = 2048
 
 func (r *Receiver) Receive() {
-	conn, err := net.Dial("tcp", net.JoinHostPort(r.Address, r.Port))
+	serverAddress := net.JoinHostPort(r.Address, r.Port)
+	fmt.Printf("Connecting to sender at %s...\n", serverAddress)
+	conn, err := net.DialTimeout("tcp", serverAddress, 10*time.Second)
 	if err != nil {
-		log.Fatalf("Error connecting to the sender %v\n", err)
+		log.Fatalf("Error connecting to sender at %s: %v\n", serverAddress, err)
 	}
 	defer conn.Close()
+	fmt.Printf("Connected to %s; waiting for file header...\n", conn.RemoteAddr())
 
+	if err := conn.SetReadDeadline(time.Now().Add(30 * time.Second)); err != nil {
+		log.Fatalf("Error setting header timeout: %v\n", err)
+	}
 	header, err := protocol.Decode(conn)
 	if err != nil {
-		log.Fatalf("Error reading header%v\n", err)
+		log.Fatalf("Error reading file header from sender: %v\n", err)
+	}
+	if err := conn.SetReadDeadline(time.Time{}); err != nil {
+		log.Fatalf("Error clearing header timeout: %v\n", err)
 	}
 
 	fmt.Println("Original filename", header.Name)
