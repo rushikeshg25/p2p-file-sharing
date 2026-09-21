@@ -64,6 +64,9 @@ func Decode(r io.Reader) (*FileHeader, error) {
 		return nil, errors.New("invalid version")
 	}
 
+	if h.NameLen == 0 {
+		return nil, errors.New("filename is empty")
+	}
 	if h.NameLen > 0 {
 		nameBytes := make([]byte, h.NameLen)
 		if _, err := io.ReadFull(r, nameBytes); err != nil {

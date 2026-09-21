@@ -1,6 +1,7 @@
 package receiver
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -33,7 +34,12 @@ const BUFFER_SIZE = 2048
 var headerTimeout = 30 * time.Second
 var transferIdleTimeout = 30 * time.Second
 
-func (r *Receiver) Receive() error {
+func (r *Receiver) Receive() error { return r.ReceiveContext(context.Background()) }
+
+func (r *Receiver) ReceiveContext(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if err := utils.ValidatePort(r.Port); err != nil {
 		return err
 	}
@@ -48,11 +54,13 @@ func (r *Receiver) Receive() error {
 
 	serverAddress := net.JoinHostPort(r.Address, r.Port)
 	fmt.Printf("Connecting to sender at %s...\n", serverAddress)
-	conn, err := net.DialTimeout("tcp", serverAddress, 10*time.Second)
+	conn, err := (&net.Dialer{Timeout: 10 * time.Second}).DialContext(ctx, "tcp", serverAddress)
 	if err != nil {
 		return fmt.Errorf("connect to sender at %s: %w", serverAddress, err)
 	}
 	defer conn.Close()
+	stop := context.AfterFunc(ctx, func() { conn.Close() })
+	defer stop()
 	fmt.Printf("Connected to %s; waiting for file header...\n", conn.RemoteAddr())
 
 	if err := conn.SetReadDeadline(time.Now().Add(headerTimeout)); err != nil {
@@ -111,6 +119,9 @@ func (r *Receiver) Receive() error {
 	}
 	if err := file.Close(); err != nil {
 		return fmt.Errorf("close received file: %w", err)
+	}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 	if err := os.Link(tempName, r.FileName); err != nil {
 		if errors.Is(err, fs.ErrExist) {

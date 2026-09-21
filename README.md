@@ -123,3 +123,11 @@ When both commands run on the same device, the sender IP can be omitted and the 
 - Default ports can be customized based on your network setup
 - Ensure the specified port is not blocked by firewall rules
 - Use ports above 1024 to avoid requiring administrator privileges
+
+## V1 lifecycle and limits
+
+The Go APIs additionally expose `SendContext(ctx)` and `ReceiveContext(ctx)`. Cancellation closes waiting/active network operations; receiver cancellation before publication removes the temporary output. Existing `Send` and `Receive` use a background context. Each send accepts one receiver.
+
+The source must remain unchanged from checksum calculation until transfer completion. Exactly the advertised byte count is transmitted; a truncated source returns an error, and growth is not streamed past the header's size. CRC is accidental-corruption detection, not authentication. This direct TCP v1 assumes trusted network peers and does not implement encryption, peer discovery, resumable transfers or receiver acknowledgements. A successful send means bytes were written; only the receiver can confirm CRC and publication success.
+
+Run `go test -race ./...` for protocol, sender/receiver integration, exact-I/O, no-clobber and cancellation tests. [V1.md](V1.md) records scope and [HISTORY.md](HISTORY.md) records the delivery evidence.
