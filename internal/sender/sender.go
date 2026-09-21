@@ -1,6 +1,7 @@
 package sender
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
@@ -26,7 +27,12 @@ func NewSender(port string, FileName string) *Sender {
 	}
 }
 
-func (s *Sender) Send() error {
+func (s *Sender) Send() error { return s.SendContext(context.Background()) }
+
+func (s *Sender) SendContext(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if err := utils.ValidatePort(s.Port); err != nil {
 		return err
 	}
@@ -66,10 +72,16 @@ func (s *Sender) Send() error {
 	}
 	defer listener.Close()
 
-	return s.send(listener, file, fileInfo, fileName, crcVal)
+	return s.sendContext(ctx, listener, file, fileInfo, fileName, crcVal)
 }
 
 func (s *Sender) send(listener net.Listener, file *os.File, fileInfo os.FileInfo, fileName string, crcVal uint32) error {
+	return s.sendContext(context.Background(), listener, file, fileInfo, fileName, crcVal)
+}
+
+func (s *Sender) sendContext(ctx context.Context, listener net.Listener, file *os.File, fileInfo os.FileInfo, fileName string, crcVal uint32) error {
+	stop := context.AfterFunc(ctx, func() { listener.Close() })
+	defer stop()
 	fmt.Printf("Server listening on port %s\n", s.Port)
 	fmt.Printf("File: %s\n", s.FileName)
 	fmt.Printf("CRC32: %08x\n", crcVal)
@@ -80,6 +92,8 @@ func (s *Sender) send(listener net.Listener, file *os.File, fileInfo os.FileInfo
 		return fmt.Errorf("accept receiver connection: %w", err)
 	}
 	defer conn.Close()
+	stopConn := context.AfterFunc(ctx, func() { conn.Close() })
+	defer stopConn()
 
 	fmt.Printf("Connected to %s\n", conn.RemoteAddr())
 
@@ -113,17 +127,22 @@ func (s *Sender) SendFile(conn net.Conn, file *os.File, size int64) error {
 
 	progress := utils.NewProgressBar(size, "Sending")
 
-	for {
-		n, err := file.Read(buffer)
-		if err == io.EOF {
-			break
+	if size < 0 {
+		return fmt.Errorf("invalid negative size")
+	}
+	for remaining := size; remaining > 0; {
+		chunk := int64(len(buffer))
+		if remaining < chunk {
+			chunk = remaining
 		}
+		n, err := io.ReadFull(file, buffer[:chunk])
 		if err != nil {
-			return fmt.Errorf("read source file: %w", err)
+			return fmt.Errorf("source shortened during transfer: %w", err)
 		}
 		if err := writeAll(conn, buffer[:n]); err != nil {
 			return fmt.Errorf("send file data: %w", err)
 		}
+		remaining -= int64(n)
 		progress.Add(int64(n))
 	}
 	progress.Finish()
